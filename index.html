@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="請求書">
+<meta name="theme-color" content="#1a1a2e">
+<title>請求書発行システム</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;500;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --ink:#1a1a2e;--ink-light:#4a4a6a;
+  --paper:#faf8f4;--paper-dark:#f0ede6;
+  --accent:#c8973a;--accent-light:#e8c97a;--accent-pale:#f9f2e3;
+  --border:#d8d0c0;--red:#c0392b;
+  --shadow:rgba(26,26,46,0.12);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--ink);min-height:100vh;color:var(--ink);}
+#app{display:flex;height:100vh;}
+
+/* ── Sidebar ── */
+#sidebar{width:250px;min-width:250px;background:#12122a;display:flex;flex-direction:column;border-right:1px solid #2a2a4a;overflow-y:auto;}
+.sidebar-logo{padding:22px 22px 16px;border-bottom:1px solid #2a2a4a;}
+.sidebar-logo h1{font-family:'Noto Serif JP',serif;font-size:16px;color:var(--accent);letter-spacing:0.05em;}
+.sidebar-logo p{font-size:11px;color:#6a6a8a;margin-top:2px;}
+.sidebar-nav{padding:12px 10px 6px;}
+.sidebar-nav-label{font-size:10px;color:#5a5a7a;letter-spacing:0.15em;text-transform:uppercase;padding:0 10px;margin-bottom:5px;}
+.snav-btn{display:flex;align-items:center;gap:9px;width:100%;padding:9px 12px;background:none;border:none;color:#a0a0c0;font-size:13px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;border-radius:7px;transition:all 0.15s;text-align:left;}
+.snav-btn:hover{background:#1e1e3a;color:#d0d0e8;}
+.snav-btn.active{background:var(--accent);color:#12122a;font-weight:700;}
+.snav-btn .icon{font-size:15px;width:18px;text-align:center;}
+.sidebar-list{flex:1;overflow-y:auto;padding:6px 10px;border-top:1px solid #2a2a4a;}
+.sinv{padding:9px 12px;border-radius:7px;cursor:pointer;transition:all 0.15s;margin-bottom:3px;border:1px solid transparent;}
+.sinv:hover{background:#1e1e3a;}
+.sinv.active{background:#1e1e3a;border-color:var(--accent);}
+.sinv-sender{font-size:10px;color:var(--accent);font-weight:700;margin-bottom:1px;}
+.sinv-name{font-size:13px;color:#c0c0d8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sinv-row{display:flex;justify-content:space-between;margin-top:2px;}
+.sinv-date{font-size:11px;color:#5a5a7a;}
+.sinv-amt{font-size:12px;color:#a0a0c0;}
+
+/* ── Main ── */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--paper);}
+
+/* toolbar top */
+#top-bar{background:var(--paper-dark);border-bottom:1px solid var(--border);padding:10px 28px;display:flex;gap:9px;align-items:center;}
+.btn{padding:8px 18px;border-radius:7px;font-size:13px;font-family:'Noto Sans JP',sans-serif;font-weight:700;cursor:pointer;border:none;transition:all 0.18s;display:flex;align-items:center;gap:6px;white-space:nowrap;}
+.btn-primary{background:var(--accent);color:var(--ink);}
+.btn-primary:hover{background:var(--accent-light);transform:translateY(-1px);}
+.btn-secondary{background:white;color:var(--ink);border:1px solid var(--border);}
+.btn-secondary:hover{background:var(--border);}
+.btn-danger{background:#fff0ee;color:var(--red);border:1px solid #ffd0cc;}
+.btn-danger:hover{background:#ffe0dc;}
+.btn-dark{background:#12122a;color:var(--accent);border:1px solid var(--accent);}
+.btn-dark:hover{background:#1e1e3a;}
+
+/* scroll area */
+#editor-scroll{flex:1;overflow-y:auto;padding:24px 28px;}
+
+/* sections */
+.fsec{background:white;border:1px solid var(--border);border-radius:11px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 6px var(--shadow);}
+.stitle{font-family:'Noto Serif JP',serif;font-size:14px;font-weight:700;color:var(--ink);margin-bottom:14px;padding-bottom:9px;border-bottom:2px solid var(--accent-pale);display:flex;align-items:center;gap:7px;}
+.stitle::before{content:'';display:inline-block;width:4px;height:14px;background:var(--accent);border-radius:2px;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.field{display:flex;flex-direction:column;gap:4px;}
+.field label{font-size:11px;color:var(--ink-light);font-weight:700;letter-spacing:0.04em;}
+.field input,.field textarea,.field select{border:1px solid var(--border);border-radius:6px;padding:8px 11px;font-size:13px;font-family:'Noto Sans JP',sans-serif;color:var(--ink);background:var(--paper);transition:border-color 0.15s;outline:none;}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--accent);background:white;}
+.field textarea{resize:vertical;min-height:54px;}
+
+/* sender cards */
+.sender-cards{display:flex;gap:9px;margin-bottom:14px;flex-wrap:wrap;}
+.sender-card{flex:1;min-width:130px;padding:12px 14px;border:2px solid var(--border);border-radius:9px;cursor:pointer;transition:all 0.2s;background:var(--paper);}
+.sender-card:hover{border-color:var(--accent-light);}
+.sender-card.sel{border-color:var(--accent);background:var(--accent-pale);}
+.sender-card .sc-name{font-size:13px;font-weight:700;color:var(--ink);}
+.sender-card .sc-sub{font-size:11px;color:var(--ink-light);margin-top:2px;}
+.sender-card.add-c{border-style:dashed;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--ink-light);font-size:12px;}
+.sender-card.add-c:hover{border-color:var(--accent);color:var(--accent);}
+.sender-preview{background:var(--paper-dark);border:1px solid var(--border);border-radius:7px;padding:12px 16px;font-size:12px;line-height:1.95;color:var(--ink-light);}
+.sender-preview strong{color:var(--ink);font-size:13px;display:block;margin-bottom:3px;}
+
+/* items table */
+.items-tbl{width:100%;border-collapse:collapse;}
+.items-tbl th{font-size:11px;color:var(--ink-light);font-weight:700;padding:7px 9px;background:var(--paper-dark);border-bottom:2px solid var(--border);text-align:left;}
+.items-tbl td{padding:4px 4px;border-bottom:1px solid var(--border);vertical-align:top;}
+.items-tbl td input,.items-tbl td textarea{width:100%;border:1px solid transparent;border-radius:5px;padding:7px 8px;font-size:13px;font-family:'Noto Sans JP',sans-serif;background:transparent;outline:none;transition:all 0.14s;}
+.items-tbl td input:focus,.items-tbl td textarea:focus{border-color:var(--accent);background:var(--accent-pale);}
+.items-tbl td input.r{text-align:right;}
+.items-tbl td textarea{resize:vertical;min-height:42px;}
+.items-tbl td.sub{text-align:right;font-size:13px;padding-right:8px;font-weight:500;padding-top:12px;}
+.del-btn{background:none;border:none;cursor:pointer;color:#c0b0a0;font-size:14px;padding:4px 7px;border-radius:4px;transition:all 0.14s;margin-top:7px;}
+.del-btn:hover{background:#ffe8e8;color:var(--red);}
+.add-row{display:flex;align-items:center;gap:6px;background:none;border:1px dashed var(--border);color:var(--ink-light);font-size:13px;font-family:'Noto Sans JP',sans-serif;padding:7px 14px;border-radius:6px;cursor:pointer;margin-top:9px;transition:all 0.14s;}
+.add-row:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-pale);}
+
+/* totals */
+.total-box{background:var(--ink);color:white;border-radius:9px;padding:16px 20px;margin-top:14px;}
+.tot-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:#a0a0c0;border-bottom:1px solid #2a2a4a;}
+.tot-row:last-child{border-bottom:none;}
+.tot-row.big{font-size:17px;font-weight:700;color:var(--accent);font-family:'Noto Serif JP',serif;margin-top:3px;}
+.tot-row .amt{font-size:14px;color:white;}
+.tot-row.big .amt{font-size:19px;color:var(--accent);}
+
+/* history tab */
+.hist-tbl{width:100%;border-collapse:collapse;background:white;border-radius:11px;overflow:hidden;box-shadow:0 1px 6px var(--shadow);}
+.hist-tbl th{background:var(--ink);color:#a0a0c0;font-size:11px;letter-spacing:0.08em;padding:11px 15px;text-align:left;font-weight:500;}
+.hist-tbl td{padding:12px 15px;border-bottom:1px solid var(--border);font-size:13px;}
+.hist-tbl tr:last-child td{border-bottom:none;}
+.hist-tbl tr:hover td{background:var(--accent-pale);cursor:pointer;}
+
+.ph{margin-bottom:20px;}
+.ph h2{font-family:'Noto Serif JP',serif;font-size:20px;color:var(--ink);}
+.ph p{font-size:13px;color:var(--ink-light);margin-top:2px;}
+.empty{text-align:center;padding:50px 20px;color:var(--ink-light);}
+.empty .emo{font-size:42px;margin-bottom:12px;}
+
+/* notification */
+#notif{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:var(--accent);padding:11px 22px;border-radius:8px;font-size:13px;font-weight:700;box-shadow:0 4px 14px var(--shadow);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);z-index:9999;}
+#notif.show{transform:translateX(-50%) translateY(0);}
+
+/* ── Invoice print style ── */
+.inv-page{width:100%;background:white;padding:38px 48px;font-family:'Noto Sans JP',sans-serif;color:#111;font-size:13px;line-height:1.7;}
+.inv-page h1{text-align:center;font-family:'Noto Serif JP',serif;font-size:25px;font-weight:700;letter-spacing:0.35em;margin-bottom:24px;color:#111;}
+.inv-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;gap:22px;}
+.inv-to{flex:1;}
+.inv-to-co{font-size:17px;font-weight:700;margin-bottom:3px;}
+.inv-greeting{font-size:12px;color:#444;line-height:1.9;margin-top:7px;}
+.inv-from{text-align:right;min-width:190px;}
+.inv-from .idate{font-size:13px;margin-bottom:7px;}
+.inv-from .ico{font-size:14px;font-weight:700;margin-bottom:3px;}
+.inv-from .iaddr{font-size:11px;color:#555;line-height:1.8;}
+.inv-total-band{border:2px solid #111;padding:9px 18px;display:flex;justify-content:space-between;align-items:center;margin:14px 0;background:#f9f9f9;}
+.inv-total-band .tl{font-size:14px;font-weight:700;}
+.inv-total-band .ta{font-size:21px;font-weight:700;font-family:'Noto Serif JP',serif;}
+.inv-tbl{width:100%;border-collapse:collapse;margin-bottom:12px;}
+.inv-tbl th{background:#222;color:white;font-size:12px;padding:7px 9px;text-align:center;font-weight:500;letter-spacing:0.04em;}
+.inv-tbl td{border:1px solid #ccc;padding:7px 9px;font-size:12px;vertical-align:top;}
+.inv-tbl td.no{text-align:center;color:#777;width:34px;}
+.inv-tbl td.desc{white-space:pre-line;}
+.inv-tbl td.num{text-align:right;width:78px;}
+.inv-tbl td.amt{text-align:right;width:106px;font-weight:500;}
+.inv-tbl tr.emp td{color:#ddd;height:30px;}
+.inv-tbl tfoot td{background:#f5f5f5;font-weight:700;text-align:right;font-size:13px;padding:9px;border:1px solid #ccc;}
+.inv-tbl tfoot .taxrow td{background:white;font-weight:400;font-size:11px;color:#666;}
+.bank-box{border:1px solid #bbb;padding:11px 16px;margin-top:12px;background:#fafafa;border-radius:3px;}
+.bank-box .btitle{font-weight:700;font-size:13px;margin-bottom:7px;border-bottom:1px solid #ddd;padding-bottom:4px;}
+.bank-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px 20px;}
+.bank-row{display:flex;gap:9px;font-size:12px;}
+.bank-row .bl{color:#666;min-width:78px;}
+.bank-row .bv{font-weight:500;}
+.inv-due{font-size:12px;color:#c0392b;font-weight:700;margin-top:11px;text-align:right;}
+
+/* preview panel */
+#preview-panel{display:none;position:fixed;top:0;right:0;bottom:0;width:620px;background:#e4e4e4;box-shadow:-4px 0 24px var(--shadow);z-index:100;flex-direction:column;overflow:hidden;}
+#preview-panel.show{display:flex;}
+.prev-head{background:var(--ink);padding:13px 18px;display:flex;align-items:center;justify-content:space-between;}
+.prev-head h3{font-size:14px;color:var(--accent);font-family:'Noto Serif JP',serif;}
+.prev-close{background:none;border:none;color:#a0a0c0;font-size:19px;cursor:pointer;line-height:1;}
+.prev-bar{background:#1e1e3a;padding:8px 14px;display:flex;gap:9px;}
+.prev-bar .btn{padding:6px 13px;font-size:12px;}
+#preview-body{flex:1;overflow-y:auto;}
+
+@media print{body>*{display:none!important;}#print-area{display:block!important;position:static!important;}#print-area .inv-page{padding:22px 30px;}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Sidebar ── -->
+  <div id="sidebar">
+    <div class="sidebar-logo">
+      <h1>請求書システム</h1>
+      <p>Invoice Manager</p>
+    </div>
+    <div class="sidebar-nav">
+      <div class="sidebar-nav-label">メニュー</div>
+      <button class="snav-btn active" onclick="showView('editor')" id="nav-editor"><span class="icon">📝</span>請求書作成</button>
+      <button class="snav-btn" onclick="showView('history')" id="nav-history"><span class="icon">📁</span>履歴</button>
+      <button class="snav-btn" onclick="showView('companies')" id="nav-companies"><span class="icon">🏢</span>発行元管理</button>
+    </div>
+    <div class="sidebar-list" id="sidebar-list"></div>
+  </div>
+
+  <!-- ── Main ── -->
+  <div id="main">
+
+    <!-- ===== EDITOR VIEW ===== -->
+    <div id="view-editor" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+      <div id="top-bar">
+        <button class="btn btn-dark"      onclick="newInvoice()">＋ 新規作成</button>
+        <button class="btn btn-secondary" onclick="saveInvoice()">💾 保存</button>
+        <button class="btn btn-primary"   onclick="showPreview()">👁 プレビュー</button>
+        <button class="btn btn-secondary" onclick="downloadPDF()">📥 PDFダウンロード</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-danger"    onclick="deleteInvoice()">🗑 削除</button>
+      </div>
+
+      <div id="editor-scroll">
+
+        <!-- 日付 -->
+        <div class="fsec">
+          <div class="stitle">日付・支払期限</div>
+          <div class="g2">
+            <div class="field"><label>発行日</label><input type="date" id="inv_date"></div>
+            <div class="field"><label>支払期限</label><input type="date" id="inv_due"></div>
+          </div>
+        </div>
+
+        <!-- 発行元 -->
+        <div class="fsec">
+          <div class="stitle">発行元</div>
+          <div class="sender-cards" id="sender-cards"></div>
+          <div class="sender-preview" id="sender-preview"></div>
+        </div>
+
+        <!-- 請求先 -->
+        <div class="fsec">
+          <div class="stitle">請求先</div>
+          <div class="g3">
+            <div class="field" style="grid-column:span 2"><label>会社名 / 氏名</label><input type="text" id="to_name" placeholder="株式会社△△"></div>
+            <div class="field"><label>敬称</label>
+              <select id="to_honorific">
+                <option value="御中">御中</option>
+                <option value="様">様</option>
+                <option value="殿">殿</option>
+                <option value="">（なし）</option>
+              </select>
+            </div>
+          </div>
+          <div class="field" style="margin-top:11px"><label>部署・担当者名（任意）</label><input type="text" id="to_dept" placeholder="総務部 山田様"></div>
+        </div>
+
+        <!-- 挨拶文 -->
+        <div class="fsec">
+          <div class="stitle">挨拶文</div>
+          <div class="field"><textarea id="inv_greeting" rows="3"></textarea></div>
+        </div>
+
+        <!-- 明細 -->
+        <div class="fsec">
+          <div class="stitle">明細項目</div>
+          <table class="items-tbl">
+            <thead><tr>
+              <th style="width:30px">NO</th>
+              <th>摘要</th>
+              <th style="width:108px">単価（税抜）</th>
+              <th style="width:68px">回数</th>
+              <th style="width:112px">金額（税抜）</th>
+              <th style="width:38px"></th>
+            </tr></thead>
+            <tbody id="items-body"></tbody>
+          </table>
+          <button class="add-row" onclick="addItem()">＋ 項目を追加</button>
+          <div class="total-box">
+            <div class="tot-row"><span>小計（税抜）</span><span class="amt" id="sum-subtotal">¥0</span></div>
+            <div class="tot-row"><span>消費税（10%）</span><span class="amt" id="sum-tax">¥0</span></div>
+            <div class="tot-row big"><span>御請求金額（税込）</span><span class="amt" id="sum-total">¥0</span></div>
+          </div>
+        </div>
+
+        <!-- 口座情報 -->
+        <div class="fsec">
+          <div class="stitle">口座情報（振込先）</div>
+          <div style="font-size:12px;color:var(--ink-light);margin-bottom:11px;background:var(--accent-pale);padding:7px 11px;border-radius:6px;">💡 発行元会社を選ぶと自動セットされます。変更も可能です。</div>
+          <div class="g2">
+            <div class="field"><label>金融機関名</label><input type="text" id="bank_name"></div>
+            <div class="field"><label>支店名</label><input type="text" id="bank_branch"></div>
+            <div class="field" style="margin-top:11px"><label>口座種別</label>
+              <select id="bank_type"><option value="普通口座">普通口座</option><option value="当座口座">当座口座</option></select>
+            </div>
+            <div class="field" style="margin-top:11px"><label>口座番号</label><input type="text" id="bank_no"></div>
+            <div class="field" style="margin-top:11px;grid-column:span 2"><label>口座名義</label><input type="text" id="bank_holder"></div>
+          </div>
+        </div>
+
+      </div><!-- /editor-scroll -->
+    </div><!-- /view-editor -->
+
+    <!-- ===== HISTORY VIEW ===== -->
+    <div id="view-history" style="display:none;flex:1;overflow-y:auto;padding:24px 28px;">
+      <div class="ph"><h2>請求書履歴</h2><p>クリックで編集できます</p></div>
+      <table class="hist-tbl">
+        <thead><tr><th>発行日</th><th>発行元</th><th>請求先</th><th>金額（税込）</th><th>支払期限</th></tr></thead>
+        <tbody id="hist-body"></tbody>
+      </table>
+      <div id="hist-empty" class="empty" style="display:none"><div class="emo">📂</div><p>まだ請求書がありません</p></div>
+    </div>
+
+    <!-- ===== COMPANIES VIEW ===== -->
+    <div id="view-companies" style="display:none;flex:1;overflow-y:auto;padding:24px 28px;">
+      <div class="ph"><h2>発行元会社管理</h2><p>会社情報・口座情報を登録・編集します</p></div>
+      <div id="co-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;margin-bottom:16px;"></div>
+      <button class="btn btn-dark" onclick="addCompanyForm()" id="add-co-btn">＋ 2社目を登録する</button>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- Preview Panel -->
+<div id="preview-panel">
+  <div class="prev-head">
+    <h3>📄 プレビュー</h3>
+    <button class="prev-close" onclick="closePreview()">✕</button>
+  </div>
+  <div class="prev-bar">
+    <button class="btn btn-primary" onclick="downloadPDF()">📥 PDFダウンロード</button>
+    <button class="btn btn-secondary" onclick="closePreview()">閉じる</button>
+  </div>
+  <div id="preview-body"></div>
+</div>
+
+<div id="pdf-render" style="display:none;position:fixed;left:-9999px;top:0;width:794px;background:white;"></div>
+<div id="notif"></div>
+
+<script>
+// ── Default company data ──
+const SEED = [{
+  id:'co_tokinova',
+  name:'合同会社TOKINOVA',zip:'〒160-0023',
+  addr:'東京都新宿区西新宿3丁目3番13号\n西新宿, 水間ビル2F',
+  tel:'',email:'',invoice_reg:'',
+  bank_name:'GMOあおぞらネット銀行',bank_branch:'フリー支店',
+  bank_type:'普通口座',bank_no:'1167813',bank_holder:'合同会社TOKINOVA'
+}];
+
+let companies = JSON.parse(localStorage.getItem('inv_co_v1')||'null') || JSON.parse(JSON.stringify(SEED));
+let invoices  = JSON.parse(localStorage.getItem('inv_data_v1')||'[]');
+let currentId = null;
+let selCid    = companies[0]?.id || null;
+let items     = [];
+
+// ── Init ──
+window.onload = () => {
+  saveCompanies();
+  setDefaults();
+  renderSidebar();
+  renderSenderCards();
+  renderCompaniesView();
+  if (invoices.length > 0) loadInvoice(invoices[invoices.length-1].id);
+  else newInvoice();
+};
+
+function saveCompanies(){ localStorage.setItem('inv_co_v1', JSON.stringify(companies)); }
+
+function setDefaults(){
+  const today = new Date();
+  const due   = new Date(today.getFullYear(), today.getMonth()+1, 0);
+  set('inv_date', fmtDate(today));
+  set('inv_due',  fmtDate(due));
+  if (!g('inv_greeting').value)
+    g('inv_greeting').value = '平素は格別のお引き立てを賜り厚く御礼申し上げます。\n下記の通り御請求申し上げます。\nよろしくお願いいたします。';
+}
+
+// ── Utils ──
+function g(id){ return document.getElementById(id); }
+function v(id){ return g(id)?.value||''; }
+function set(id,val){ const el=g(id); if(el) el.value=val; }
+function fmtDate(d){ return d.toISOString().split('T')[0]; }
+function fmtJP(s){
+  if(!s) return '';
+  const [y,m,d]=s.split('-');
+  return `${y}年${parseInt(m)}月${parseInt(d)}日`;
+}
+function fmt2(n){ return Math.round(Number(n)).toLocaleString('ja-JP'); }
+function genId(){ return 'inv_'+Date.now()+Math.random().toString(36).slice(2); }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Views ──
+function showView(view){
+  ['editor','history','companies'].forEach(v=>{
+    const el=g(`view-${v}`);
+    if(el) el.style.display='none';
+    const nav=g(`nav-${v}`);
+    if(nav) nav.classList.remove('active');
+  });
+  const el=g(`view-${view}`);
+  if(el) el.style.display = view==='editor' ? 'flex' : 'block';
+  const nav=g(`nav-${view}`);
+  if(nav) nav.classList.add('active');
+  if(view==='history')   renderHistory();
+  if(view==='companies') renderCompaniesView();
+}
+
+// ── Sender cards ──
+function renderSenderCards(){
+  const box=g('sender-cards');
+  box.innerHTML='';
+  companies.forEach(c=>{
+    const div=document.createElement('div');
+    div.className='sender-card'+(c.id===selCid?' sel':'');
+    div.innerHTML=`<div class="sc-name">${esc(c.name)||'（未設定）'}</div><div class="sc-sub">${esc(c.zip)}</div>`;
+    div.onclick=()=>selectCompany(c.id);
+    box.appendChild(div);
+  });
+  if(companies.length<2){
+    const div=document.createElement('div');
+    div.className='sender-card add-c';
+    div.innerHTML='<div style="font-size:20px">＋</div><div>2社目を登録</div>';
+    div.onclick=()=>{ addCompanyForm(); showView('companies'); };
+    box.appendChild(div);
+  }
+  updateSenderPreview();
+}
+
+function selectCompany(id){
+  selCid=id;
+  renderSenderCards();
+  // fill bank from company (only if not manually edited)
+  const c=companies.find(x=>x.id===id);
+  if(!c) return;
+  ['bank_name','bank_branch','bank_type','bank_no','bank_holder'].forEach(fld=>{
+    const el=g(fld);
+    if(el && !el.dataset.edited) el.value=c[fld]||'';
+  });
+}
+
+function updateSenderPreview(){
+  const c=companies.find(x=>x.id===selCid);
+  const el=g('sender-preview');
+  if(!c){ el.innerHTML='会社を選択してください'; return; }
+  const lines=[c.zip,c.addr,c.tel?`TEL: ${c.tel}`:'',c.email,c.invoice_reg?`登録番号: ${c.invoice_reg}`:''].filter(Boolean);
+  el.innerHTML=`<strong>${esc(c.name)}</strong>${lines.map(l=>esc(l).replace(/\n/g,'<br>')).join('<br>')}`;
+}
+
+// mark bank fields as edited when user types
+['bank_name','bank_branch','bank_type','bank_no','bank_holder'].forEach(id=>{
+  document.addEventListener('DOMContentLoaded',()=>{
+    const el=g(id);
+    if(el) el.addEventListener('input',()=>{ el.dataset.edited='1'; });
+  });
+});
+
+// ── Items ──
+function addItem(name='',price=0,qty=1){
+  items.push({id:'i'+Date.now()+Math.random(),name,price,qty});
+  renderItems();
+}
+
+function renderItems(){
+  const tbody=g('items-body');
+  tbody.innerHTML='';
+  items.forEach((it,idx)=>{
+    const sub=it.price*it.qty;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td style="text-align:center;color:#999;font-size:12px;padding-top:12px">${idx+1}</td>
+      <td><textarea oninput="updItem('${it.id}','name',this.value)" placeholder="例：2026年3月 稼働分">${esc(it.name)}</textarea></td>
+      <td><input type="number" class="r" value="${it.price}" min="0" step="1" oninput="updItem('${it.id}','price',this.value)"></td>
+      <td><input type="number" class="r" value="${it.qty}"  min="1" step="1" oninput="updItem('${it.id}','qty',this.value)"></td>
+      <td class="sub">(${fmt2(sub)})</td>
+      <td><button class="del-btn" onclick="delItem('${it.id}')">✕</button></td>`;
+    tbody.appendChild(tr);
+  });
+  calcTotals();
+}
+
+function updItem(id,key,val){
+  const it=items.find(i=>i.id===id); if(!it) return;
+  if(key==='price'||key==='qty') it[key]=parseFloat(val)||0; else it[key]=val;
+  document.querySelectorAll('#items-body tr').forEach((tr,idx)=>{
+    if(items[idx]?.id===id) tr.querySelector('.sub').textContent='('+fmt2(items[idx].price*items[idx].qty)+')';
+  });
+  calcTotals();
+}
+
+function delItem(id){ items=items.filter(i=>i.id!==id); renderItems(); }
+
+function calcTotals(){
+  const subtotal=items.reduce((s,i)=>s+i.price*i.qty,0);
+  const tax=Math.floor(subtotal*0.1);
+  const total=subtotal+tax;
+  g('sum-subtotal').textContent='¥'+fmt2(subtotal);
+  g('sum-tax').textContent='¥'+fmt2(tax);
+  g('sum-total').textContent='¥'+fmt2(total);
+}
+
+// ── Collect / Fill ──
+function collect(){
+  return {
+    id:currentId, company_id:selCid,
+    date:v('inv_date'), due:v('inv_due'), greeting:v('inv_greeting'),
+    to_name:v('to_name'), to_honorific:v('to_honorific'), to_dept:v('to_dept'),
+    bank_name:v('bank_name'), bank_branch:v('bank_branch'),
+    bank_type:v('bank_type'), bank_no:v('bank_no'), bank_holder:v('bank_holder'),
+    items:JSON.parse(JSON.stringify(items)),
+    updatedAt:new Date().toISOString()
+  };
+}
+
+function fill(data){
+  selCid=data.company_id||(companies[0]?.id)||null;
+  const map={inv_date:'date',inv_due:'due',inv_greeting:'greeting',
+    to_name:'to_name',to_honorific:'to_honorific',to_dept:'to_dept',
+    bank_name:'bank_name',bank_branch:'bank_branch',
+    bank_type:'bank_type',bank_no:'bank_no',bank_holder:'bank_holder'};
+  Object.entries(map).forEach(([elId,key])=>{ const el=g(elId); if(el&&data[key]!==undefined) el.value=data[key]; });
+  items=data.items?JSON.parse(JSON.stringify(data.items)):[];
+  renderItems();
+  renderSenderCards();
+}
+
+// ── CRUD ──
+function newInvoice(){
+  currentId=genId();
+  items=[];
+  ['to_name','to_dept'].forEach(id=>set(id,''));
+  set('to_honorific','御中');
+  // auto-fill bank from selected company
+  const c=companies.find(x=>x.id===selCid);
+  ['bank_name','bank_branch','bank_type','bank_no','bank_holder'].forEach(fld=>{
+    const el=g(fld); if(el){ el.value=c?c[fld]||'':''; delete el.dataset.edited; }
+  });
+  setDefaults();
+  renderItems();
+  renderSenderCards();
+  showView('editor');
+  renderSidebar();
+  notify('新規請求書を作成しました');
+}
+
+function saveInvoice(){
+  const data=collect();
+  const idx=invoices.findIndex(i=>i.id===currentId);
+  if(idx>=0) invoices[idx]=data; else invoices.push(data);
+  localStorage.setItem('inv_data_v1',JSON.stringify(invoices));
+  renderSidebar();
+  notify('保存しました ✓');
+}
+
+function loadInvoice(id){
+  const data=invoices.find(i=>i.id===id); if(!data) return;
+  currentId=id; fill(data);
+  showView('editor');
+  renderSidebar();
+}
+
+function deleteInvoice(){
+  if(!currentId) return;
+  if(!confirm('この請求書を削除しますか？')) return;
+  invoices=invoices.filter(i=>i.id!==currentId);
+  localStorage.setItem('inv_data_v1',JSON.stringify(invoices));
+  renderSidebar();
+  if(invoices.length>0) loadInvoice(invoices[invoices.length-1].id);
+  else newInvoice();
+  notify('削除しました');
+}
+
+// ── Sidebar ──
+function renderSidebar(){
+  const list=g('sidebar-list');
+  if(!invoices.length){ list.innerHTML='<div style="padding:12px;color:#5a5a7a;font-size:12px;">まだ請求書がありません</div>'; return; }
+  list.innerHTML=invoices.slice().reverse().map(inv=>{
+    const sub=(inv.items||[]).reduce((s,i)=>s+i.price*i.qty,0);
+    const total=sub+Math.floor(sub*0.1);
+    const co=companies.find(c=>c.id===inv.company_id);
+    return `<div class="sinv ${inv.id===currentId?'active':''}" onclick="loadInvoice('${inv.id}')">
+      ${co?`<div class="sinv-sender">${esc(co.name)}</div>`:''}
+      <div class="sinv-name">${esc(inv.to_name||'（請求先未設定）')} ${inv.to_honorific||''}</div>
+      <div class="sinv-row">
+        <span class="sinv-date">${inv.date||'-'}</span>
+        <span class="sinv-amt">¥${fmt2(total)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── History ──
+function renderHistory(){
+  const tbody=g('hist-body'), empty=g('hist-empty');
+  if(!invoices.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  tbody.innerHTML=invoices.slice().reverse().map(inv=>{
+    const sub=(inv.items||[]).reduce((s,i)=>s+i.price*i.qty,0);
+    const total=sub+Math.floor(sub*0.1);
+    const co=companies.find(c=>c.id===inv.company_id);
+    return `<tr onclick="loadInvoice('${inv.id}')">
+      <td>${inv.date||'-'}</td>
+      <td>${co?esc(co.name):'-'}</td>
+      <td><strong>${esc(inv.to_name||'（未設定）')}</strong> ${inv.to_honorific||''}</td>
+      <td style="text-align:right;font-weight:700">¥${fmt2(total)}</td>
+      <td>${inv.due||'-'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Companies view ──
+function renderCompaniesView(){
+  const grid=g('co-grid'), btn=g('add-co-btn');
+  grid.innerHTML='';
+  companies.forEach(c=>{
+    const div=document.createElement('div');
+    div.className='fsec'; div.style.marginBottom='0';
+    div.innerHTML=`
+      <div class="stitle" style="justify-content:space-between;align-items:center">
+        <span>${esc(c.name)||'（未設定）'}</span>
+        ${companies.length>1?`<button class="btn btn-danger" style="padding:4px 9px;font-size:11px" onclick="removeCo('${c.id}')">削除</button>`:''}
+      </div>
+      <div class="g2">
+        <div class="field"><label>会社名 / 氏名</label><input type="text" value="${esc(c.name)}" oninput="updCo('${c.id}','name',this.value)"></div>
+        <div class="field"><label>郵便番号</label><input type="text" value="${esc(c.zip)}" oninput="updCo('${c.id}','zip',this.value)"></div>
+        <div class="field" style="grid-column:span 2"><label>住所</label><textarea oninput="updCo('${c.id}','addr',this.value)">${esc(c.addr)}</textarea></div>
+        <div class="field"><label>電話番号（任意）</label><input type="text" value="${esc(c.tel)}" oninput="updCo('${c.id}','tel',this.value)"></div>
+        <div class="field"><label>メール（任意）</label><input type="email" value="${esc(c.email)}" oninput="updCo('${c.id}','email',this.value)"></div>
+        <div class="field" style="grid-column:span 2"><label>インボイス登録番号（任意）</label><input type="text" value="${esc(c.invoice_reg)}" placeholder="T0000000000000" oninput="updCo('${c.id}','invoice_reg',this.value)"></div>
+      </div>
+      <div style="margin-top:13px;border-top:1px solid var(--border);padding-top:13px">
+        <div style="font-weight:700;font-size:13px;margin-bottom:11px;color:var(--ink);">口座情報</div>
+        <div class="g2">
+          <div class="field"><label>金融機関名</label><input type="text" value="${esc(c.bank_name)}" oninput="updCo('${c.id}','bank_name',this.value)"></div>
+          <div class="field"><label>支店名</label><input type="text" value="${esc(c.bank_branch)}" oninput="updCo('${c.id}','bank_branch',this.value)"></div>
+          <div class="field"><label>口座種別</label>
+            <select onchange="updCo('${c.id}','bank_type',this.value)">
+              <option value="普通口座" ${c.bank_type==='普通口座'?'selected':''}>普通口座</option>
+              <option value="当座口座" ${c.bank_type==='当座口座'?'selected':''}>当座口座</option>
+            </select>
+          </div>
+          <div class="field"><label>口座番号</label><input type="text" value="${esc(c.bank_no)}" oninput="updCo('${c.id}','bank_no',this.value)"></div>
+          <div class="field" style="grid-column:span 2"><label>口座名義</label><input type="text" value="${esc(c.bank_holder)}" oninput="updCo('${c.id}','bank_holder',this.value)"></div>
+        </div>
+      </div>`;
+    grid.appendChild(div);
+  });
+  btn.style.display=companies.length>=2?'none':'flex';
+}
+
+function updCo(id,key,val){
+  const c=companies.find(x=>x.id===id); if(c){ c[key]=val; saveCompanies(); }
+  // refresh name label live
+  renderCompaniesView();
+}
+
+function addCompanyForm(){
+  if(companies.length>=2){ notify('発行元は最大2社まで登録できます'); return; }
+  companies.push({id:'co_'+Date.now(),name:'',zip:'',addr:'',tel:'',email:'',invoice_reg:'',
+    bank_name:'',bank_branch:'',bank_type:'普通口座',bank_no:'',bank_holder:''});
+  saveCompanies(); renderCompaniesView(); renderSenderCards();
+}
+
+function removeCo(id){
+  if(companies.length<=1){ notify('最低1社は必要です'); return; }
+  if(!confirm('この会社情報を削除しますか？')) return;
+  companies=companies.filter(c=>c.id!==id);
+  if(selCid===id) selCid=companies[0]?.id||null;
+  saveCompanies(); renderCompaniesView(); renderSenderCards(); notify('削除しました');
+}
+
+// ── Invoice HTML builder ──
+function buildHTML(data){
+  const co=companies.find(c=>c.id===data.company_id)||{};
+  const subtotal=(data.items||[]).reduce((s,i)=>s+i.price*i.qty,0);
+  const tax=Math.floor(subtotal*0.1);
+  const total=subtotal+tax;
+  const MAX=10;
+  let rows='';
+  for(let i=0;i<MAX;i++){
+    const it=data.items&&data.items[i];
+    if(it){
+      rows+=`<tr>
+        <td class="no">${i+1}</td>
+        <td class="desc">${esc(it.name||'').replace(/\n/g,'<br>')}</td>
+        <td class="num">${fmt2(it.price)}</td>
+        <td class="num">${it.qty}</td>
+        <td class="amt">(${fmt2(it.price*it.qty)})</td>
+      </tr>`;
+    } else {
+      rows+=`<tr class="emp"><td class="no"></td><td class="desc"></td><td class="num"></td><td class="num"></td><td class="amt">(0)</td></tr>`;
+    }
+  }
+  const fromLines=[co.zip,co.addr,co.tel?`TEL: ${co.tel}`:'',co.email,co.invoice_reg?`登録番号: ${co.invoice_reg}`:''].filter(Boolean);
+  const fromHTML=fromLines.map(l=>`<div>${esc(l).replace(/\n/g,'<br>')}</div>`).join('');
+  const bFields=[['金融機関名',data.bank_name],['支店名',data.bank_branch],['口座種別',data.bank_type],['口座番号',data.bank_no],['口座名義',data.bank_holder]].filter(r=>r[1]);
+  const bRows=bFields.map(r=>`<div class="bank-row"><span class="bl">${r[0]}</span><span class="bv">${esc(r[1])}</span></div>`).join('');
+
+  return `<div class="inv-page">
+    <h1>請　求　書</h1>
+    <div class="inv-top">
+      <div class="inv-to">
+        <div class="inv-to-co">${esc(data.to_name||'')}　${data.to_honorific||''}</div>
+        ${data.to_dept?`<div style="font-size:12px;color:#555;margin-top:2px">${esc(data.to_dept)}</div>`:''}
+        ${data.greeting?`<div class="inv-greeting">${esc(data.greeting).replace(/\n/g,'<br>')}</div>`:''}
+      </div>
+      <div class="inv-from">
+        <div class="idate">発行日：${fmtJP(data.date)}</div>
+        <div class="ico">${esc(co.name||'')}</div>
+        <div class="iaddr">${fromHTML}</div>
+      </div>
+    </div>
+    <div class="inv-total-band">
+      <span class="tl">御請求金額</span>
+      <span class="ta">${fmt2(total)}円（税込）</span>
+    </div>
+    <table class="inv-tbl">
+      <thead><tr>
+        <th style="width:34px">NO</th><th>摘要</th>
+        <th style="width:86px;text-align:right">単価</th>
+        <th style="width:56px;text-align:right">回数</th>
+        <th style="width:106px;text-align:right">金額</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot>
+        <tr><td colspan="4" style="text-align:right;padding-right:10px">小計（税抜）</td><td style="text-align:right">${fmt2(subtotal)}円</td></tr>
+        <tr><td colspan="4" style="text-align:right;padding-right:10px">消費税（10%）</td><td style="text-align:right">${fmt2(tax)}円</td></tr>
+        <tr><td colspan="4" style="text-align:right;padding-right:10px;font-weight:700">合　計（税込）</td><td style="text-align:right;font-weight:700">${fmt2(total)}円</td></tr>
+      </tfoot>
+    </table>
+    ${bRows?`<div class="bank-box"><div class="btitle">（口座情報）</div><div class="bank-grid">${bRows}</div></div>`:''}
+    ${data.due?`<div class="inv-due">お支払い期限：${fmtJP(data.due)}までにお振込下さいませ。</div>`:''}
+  </div>`;
+}
+
+function showPreview(){ g('preview-body').innerHTML=buildHTML(collect()); g('preview-panel').classList.add('show'); }
+function closePreview(){ g('preview-panel').classList.remove('show'); }
+async function downloadPDF(){
+  const data = collect();
+  // Build invoice HTML in hidden render area
+  const pa = g('pdf-render');
+  pa.innerHTML = buildHTML(data);
+  pa.style.display = 'block';
+
+  notify('PDF生成中… しばらくお待ちください');
+
+  // Wait for fonts/images to load
+  await new Promise(r => setTimeout(r, 500));
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const canvas = await html2canvas(pa, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const imgW = pageW;
+    const imgH = (canvas.height * imgW) / canvas.width;
+
+    // If taller than one page, scale to fit
+    if (imgH <= pageH) {
+      pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
+    } else {
+      pdf.addImage(imgData, 'JPEG', 0, 0, imgW, pageH);
+    }
+
+    // Generate filename
+    const toName = (data.to_name || '請求書').replace(/[\/\\:*?"<>|]/g, '');
+    const dateStr = (data.date || '').replace(/-/g, '');
+    pdf.save(`請求書_${toName}_${dateStr}.pdf`);
+    notify('PDFを保存しました ✓');
+  } catch(e) {
+    notify('PDF生成に失敗しました');
+    console.error(e);
+  } finally {
+    pa.style.display = 'none';
+    pa.innerHTML = '';
+  }
+}
+
+function notify(msg){
+  const el=g('notif'); el.textContent=msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2500);
+}
+
+// Service Worker 登録
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
