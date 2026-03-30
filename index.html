@@ -8,9 +8,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="請求書">
 <meta name="theme-color" content="#1a1a2e">
-<title>請求書発行システム</title>
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>請求書システム</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;500;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -171,6 +171,93 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--ink);min-height:100v
 #preview-body{flex:1;overflow-y:auto;}
 
 @media print{body>*{display:none!important;}#print-area{display:block!important;position:static!important;}#print-area .inv-page{padding:22px 30px;}}
+
+/* ── モバイル底部タブバー ── */
+#mobile-tabbar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* サイドバー完全非表示 */
+  #sidebar { display: none !important; }
+
+  /* アプリ全体を縦並び */
+  #app { flex-direction: column; height: 100dvh; }
+  #main { flex: 1; overflow: hidden; padding-bottom: 64px; }
+
+  /* 上部ツールバー：ボタンを2行に折り返し */
+  #top-bar {
+    padding: 8px 10px;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  #top-bar .btn {
+    padding: 8px 12px;
+    font-size: 12px;
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+  }
+  #top-bar .spacer { display: none; }
+
+  /* コンテンツスクロール */
+  #editor-scroll { padding: 14px 12px; }
+  .fsec { padding: 16px 14px; margin-bottom: 12px; }
+
+  /* グリッドを1列に */
+  .g2, .g3 { grid-template-columns: 1fr !important; }
+
+  /* 発行元カード縦並び */
+  .sender-cards { flex-direction: column; }
+
+  /* 明細テーブル：回数列を非表示 */
+  .items-tbl { font-size: 12px; }
+  .items-tbl th:nth-child(4), .items-tbl td:nth-child(4) { display: none; }
+  .items-tbl th:nth-child(3) { width: 80px; }
+  .items-tbl th:nth-child(5) { width: 80px; }
+
+  /* プレビューを全画面に */
+  #preview-panel { width: 100%; left: 0; }
+  .inv-page { padding: 18px 14px; font-size: 11px; }
+  .inv-total-band .ta { font-size: 15px; }
+  .inv-top { flex-direction: column; gap: 12px; }
+  .inv-from { text-align: left; }
+
+  /* 履歴・会社管理ビューのスクロール */
+  #view-history, #view-companies { padding: 14px 12px; }
+  .hist-tbl th:nth-child(2), .hist-tbl td:nth-child(2) { display: none; }
+
+  /* モバイルタブバー表示 */
+  #mobile-tabbar {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 64px;
+    background: #12122a;
+    border-top: 1px solid #2a2a4a;
+    z-index: 200;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .mtab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #6a6a8a;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 10px;
+    transition: color 0.15s;
+    padding: 0;
+  }
+  .mtab.active { color: var(--accent); }
+  .mtab .micon { font-size: 22px; line-height: 1; }
+}
+
 </style>
 </head>
 <body>
@@ -201,7 +288,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--ink);min-height:100v
         <button class="btn btn-secondary" onclick="saveInvoice()">💾 保存</button>
         <button class="btn btn-primary"   onclick="showPreview()">👁 プレビュー</button>
         <button class="btn btn-secondary" onclick="downloadPDF()">📥 PDFダウンロード</button>
-        <div style="flex:1"></div>
+        <div class="spacer" style="flex:1"></div>
         <button class="btn btn-danger"    onclick="deleteInvoice()">🗑 削除</button>
       </div>
 
@@ -304,6 +391,19 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--ink);min-height:100v
     </div>
 
   </div><!-- /main -->
+<!-- ── モバイル底部タブバー ── -->
+<div id="mobile-tabbar">
+  <button class="mtab active" id="mtab-editor" onclick="showView('editor')">
+    <span class="micon">📝</span>作成
+  </button>
+  <button class="mtab" id="mtab-history" onclick="showView('history')">
+    <span class="micon">📁</span>履歴
+  </button>
+  <button class="mtab" id="mtab-companies" onclick="showView('companies')">
+    <span class="micon">🏢</span>発行元
+  </button>
+</div>
+
 </div><!-- /app -->
 
 <!-- Preview Panel -->
@@ -382,11 +482,15 @@ function showView(view){
     if(el) el.style.display='none';
     const nav=g(`nav-${v}`);
     if(nav) nav.classList.remove('active');
+    const mtab=g(`mtab-${v}`);
+    if(mtab) mtab.classList.remove('active');
   });
   const el=g(`view-${view}`);
   if(el) el.style.display = view==='editor' ? 'flex' : 'block';
   const nav=g(`nav-${view}`);
   if(nav) nav.classList.add('active');
+  const mtab=g(`mtab-${view}`);
+  if(mtab) mtab.classList.add('active');
   if(view==='history')   renderHistory();
   if(view==='companies') renderCompaniesView();
 }
@@ -774,10 +878,10 @@ function notify(msg){
   setTimeout(()=>el.classList.remove('show'),2500);
 }
 
-// Service Worker 登録
-if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
+// ── PWA Service Worker ──
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
   });
 }
 </script>
